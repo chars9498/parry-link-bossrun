@@ -46,8 +46,8 @@ func set_role(new_role: int) -> void:
 	_update_color()
 
 func get_role_name() -> String:
-	var names: Array[String] = ["궁수", "마법사", "도적"]
-	return names[role]
+	var names := ["궁수", "마법사", "도적"]
+	return String(names[role])
 
 func on_tank_hit(damage: int) -> void:
 	hp = max(hp - damage, 0)
@@ -71,7 +71,9 @@ func fire_link_skill(perfect: bool, berserker_bonus: float) -> Dictionary:
 	var names_table: Dictionary = {Role.ARCHER: "관통 화살", Role.MAGE: "화염 폭발", Role.ROGUE: "그림자 찌르기"}
 	var base_damage: int = int(base_table.get(role, 24))
 	var skill_name: String = String(names_table.get(role, "관통 화살"))
-	var perfect_bonus: float = 0.6 if perfect else 0.0
+	var perfect_bonus: float = 0.0
+	if perfect:
+		perfect_bonus = 0.6
 	var multiplier: float = 1.0 + berserker_bonus + perfect_bonus
 	var damage: int = int(round(base_damage * multiplier))
 
@@ -86,5 +88,5 @@ func basic_damage() -> int:
 	return int(table.get(role, 7))
 
 func _update_color() -> void:
-	var colors: Array[Color] = [Color(1, 0.7, 0.4), Color(0.7, 0.5, 1), Color(1, 1, 0.5)]
-	$DealerSprite.color = colors[role]
+	var colors := [Color(1, 0.7, 0.4), Color(0.7, 0.5, 1), Color(1, 1, 0.5)]
+	$DealerSprite.color = Color(colors[role])
