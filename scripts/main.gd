@@ -53,7 +53,7 @@ func _on_parry_attempted() -> void:
 	var is_perfect: bool = result == ParryTypes.Result.PERFECT
 	var link: Dictionary = dealer.fire_link_skill(is_perfect, bonus)
 	if dealer.stunned:
-		dealer.on_parry_while_stunned(35.0)
+		dealer.add_revive_progress(35.0)
 	if is_perfect:
 		tank.set_invincible(0.7)
 		feedback_label.text = "완벽 패링! %s 강화" % String(link.get("name", "링크 스킬"))
@@ -63,7 +63,7 @@ func _on_parry_attempted() -> void:
 
 func _on_attack_landed(damage: int) -> void:
 	if tank.take_damage(damage):
-		dealer.on_tank_hit(damage)
+		dealer.take_shared_damage(damage)
 	_update_ui("%s 피격" % current_pattern)
 
 func _on_dealer_basic_attack(damage: int) -> void:
