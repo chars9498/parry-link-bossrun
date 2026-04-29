@@ -4,13 +4,13 @@ class_name KingSlime
 signal attack_telegraph(parry_total: float, parry_perfect: float, pattern_name: String)
 signal attack_landed(base_damage: int)
 
-@export var max_hp := 1400
-var hp := max_hp
+@export var max_hp: int = 1400
+var hp: int = max_hp
 
 var _tank: Tank
-var _patterns := ["박치기", "점프", "점액", "왕관"]
-var _index := 0
-var _parried := false
+var _patterns: Array[String] = ["박치기", "점프", "점액", "왕관"]
+var _index: int = 0
+var _parried: bool = false
 @onready var timer: Timer = $PatternTimer
 
 func setup(tank: Tank) -> void:
@@ -27,7 +27,7 @@ func _run_next_pattern() -> void:
 	if _tank == null or hp <= 0:
 		return
 	_parried = false
-	var p := _patterns[_index % _patterns.size()]
+	var p: String = String(_patterns[_index % _patterns.size()])
 	_index += 1
 	match p:
 		"박치기":
