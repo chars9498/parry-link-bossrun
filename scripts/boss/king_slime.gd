@@ -19,6 +19,7 @@ var _attack_dir: Vector2 = Vector2.RIGHT
 var _projectile_pos: Vector2 = Vector2.ZERO
 var _projectile_vel: Vector2 = Vector2.ZERO
 var _projectile_active: bool = false
+var _slam_target: Vector2 = Vector2.ZERO
 
 @onready var timer: Timer = $PatternTimer
 @onready var body: Polygon2D = $BossBody
@@ -64,21 +65,26 @@ func _start_pattern() -> void:
 	var p: String = ["박치기", "점프", "점액", "왕관"][_current_pattern()]
 	match _current_pattern():
 		Pattern.CHARGE:
-			await _telegraph(0.7, 0.22, "몸통 박치기")
 			_attack_dir = (_tank.global_position - global_position).normalized()
+			await _telegraph(0.72, 0.22, "몸통 박치기")
+			global_position -= _attack_dir * 10.0
 			_state = BossState.ATTACK
-			velocity = _attack_dir * 340.0
-			await get_tree().create_timer(0.35).timeout
-			if not _parried and global_position.distance_to(_tank.global_position) <= 26.0:
+			velocity = _attack_dir * 360.0
+			await get_tree().create_timer(0.36).timeout
+			if not _parried and global_position.distance_to(_tank.global_position) <= 28.0:
 				_apply_hit_once(18)
 			_state = BossState.RECOVER
 			await get_tree().create_timer(0.35).timeout
 		Pattern.SLAM:
-			await _telegraph(0.95, 0.24, "점프 내려찍기")
-			_state = BossState.ATTACK
-			await get_tree().create_timer(0.15).timeout
-			if not _parried and global_position.distance_to(_tank.global_position) <= 60.0:
+			_slam_target = _tank.global_position
+			await _telegraph(1.0, 0.24, "점프 내려찍기")
+			await state_jump()
+			await get_tree().create_timer(0.22).timeout
+			global_position = global_position.lerp(_slam_target, 0.85)
+			body.scale = Vector2(1.12, 0.88)
+			if not _parried and global_position.distance_to(_tank.global_position) <= 62.0:
 				_apply_hit_once(22)
+			body.scale = Vector2.ONE
 			_state = BossState.RECOVER
 			await get_tree().create_timer(0.45).timeout
 		Pattern.SPIT:
@@ -92,10 +98,11 @@ func _start_pattern() -> void:
 			_state = BossState.RECOVER
 			await get_tree().create_timer(0.28).timeout
 		Pattern.CROWN:
-			await _telegraph(0.85, 0.18, "왕관 내려찍기")
+			_attack_dir = (_tank.global_position - global_position).normalized()
+			await _telegraph(0.9, 0.18, "왕관 내려찍기")
 			_state = BossState.ATTACK
 			var dir_to_tank: Vector2 = (_tank.global_position - global_position).normalized()
-			var in_range: bool = global_position.distance_to(_tank.global_position) <= 88.0
+			var in_range: bool = global_position.distance_to(_tank.global_position) <= 92.0
 			var front_dot: float = _attack_dir.dot(dir_to_tank)
 			if not _parried and in_range and front_dot >= 0.55:
 				_apply_hit_once(30)
@@ -127,3 +134,8 @@ func _apply_hit_once(damage: int) -> void:
 
 func _current_pattern() -> int:
 	return _pattern_index % 4
+
+func state_jump() -> void:
+	body.scale = Vector2(0.82, 1.22)
+	await get_tree().create_timer(0.12).timeout
+	body.scale = Vector2(1.05, 0.95)
