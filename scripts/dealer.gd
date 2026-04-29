@@ -65,7 +65,7 @@ func on_parry_while_stunned(amount: float) -> void:
 func trigger_link_skill(perfect: bool, berserker_bonus: float) -> Dictionary:
 	if stunned:
 		return {"name":"기절", "damage":0, "empowered":false}
-	var base := {Role.ARCHER:28, Role.MAGE:34, Role.ROGUE:24}[role]
+	var base: int = {Role.ARCHER: 28, Role.MAGE: 34, Role.ROGUE: 24}[role]
 	var mult := 1.0 + berserker_bonus + (0.6 if perfect else 0.0)
 	var dmg := int(round(base * mult))
 	var names := {Role.ARCHER:"관통 화살", Role.MAGE:"화염 폭발", Role.ROGUE:"그림자 찌르기"}
