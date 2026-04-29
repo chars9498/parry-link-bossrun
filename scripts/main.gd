@@ -4,19 +4,18 @@ extends Node2D
 @onready var dealer: Dealer = $World/Dealer
 @onready var boss: KingSlime = $World/KingSlime
 
-@onready var tank_hp_label: Label = $UI/HUD/TankHP
-@onready var dealer_hp_label: Label = $UI/HUD/DealerHP
-@onready var dealer_state_label: Label = $UI/HUD/DealerState
-@onready var boss_hp_label: Label = $UI/HUD/BossHP
-@onready var dealer_role_label: Label = $UI/HUD/DealerRole
-@onready var berserker_label: Label = $UI/HUD/Berserker
-@onready var feedback_label: Label = $UI/HUD/Feedback
+@onready var tank_hp_label: Label = $UI/HUDPanel/HUD/TankHP
+@onready var dealer_hp_label: Label = $UI/HUDPanel/HUD/DealerHP
+@onready var dealer_state_label: Label = $UI/HUDPanel/HUD/DealerState
+@onready var boss_hp_label: Label = $UI/HUDPanel/HUD/BossHP
+@onready var dealer_role_label: Label = $UI/HUDPanel/HUD/DealerRole
+@onready var berserker_label: Label = $UI/HUDPanel/HUD/Berserker
+@onready var feedback_label: Label = $UI/HUDPanel/HUD/Feedback
+@onready var tank_hp_bar: ProgressBar = $UI/HUDPanel/HUD/TankHPBar
+@onready var dealer_hp_bar: ProgressBar = $UI/HUDPanel/HUD/DealerHPBar
+@onready var boss_hp_bar: ProgressBar = $UI/HUDPanel/HUD/BossHPBar
 @onready var choose_panel: Panel = $UI/RoleSelect
-@onready var role_buttons: Array[Button] = [
-	$UI/RoleSelect/RoleVBox/Archer,
-	$UI/RoleSelect/RoleVBox/Mage,
-	$UI/RoleSelect/RoleVBox/Rogue
-]
+@onready var role_buttons: Array[Button] = [$UI/RoleSelect/RoleVBox/Archer, $UI/RoleSelect/RoleVBox/Mage, $UI/RoleSelect/RoleVBox/Rogue]
 
 var current_pattern: String = ""
 var combat_started: bool = false
@@ -30,11 +29,9 @@ func _ready() -> void:
 	boss.attack_landed.connect(_on_attack_landed)
 	dealer.basic_attack_fired.connect(_on_dealer_basic_attack)
 	dealer.link_skill_fired.connect(_on_link_skill_fired)
-
 	choose_panel.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 	for button in role_buttons:
 		button.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
-
 	selected_role_index = 0
 	role_buttons[selected_role_index].grab_focus()
 	_update_ui("딜러를 선택하세요")
@@ -59,15 +56,15 @@ func _move_selection(direction: int) -> void:
 	selected_role_index = (selected_role_index + direction + role_buttons.size()) % role_buttons.size()
 	role_buttons[selected_role_index].grab_focus()
 
-func _process(_delta: float) -> void:
-	if combat_started and Input.is_action_just_pressed("ui_select"):
-		dealer.cycle_role()
-		_update_ui("딜러 변경")
-
 func _on_role_button_pressed(role_index: int) -> void:
+	if combat_started:
+		return
 	selected_role_index = role_index
 	dealer.set_role(role_index)
 	choose_panel.visible = false
+	for button in role_buttons:
+		button.release_focus()
+		button.focus_mode = Control.FOCUS_NONE
 	combat_started = true
 	get_tree().paused = false
 	_update_ui("전투 시작")
@@ -93,11 +90,7 @@ func _on_parry_attempted() -> void:
 	var link: Dictionary = dealer.fire_link_skill(is_perfect, bonus)
 	if dealer.stunned:
 		dealer.add_revive_progress(35.0)
-	if is_perfect:
-		tank.set_invincible(0.7)
-		feedback_label.text = "완벽 패링! %s 강화" % String(link.get("name", "링크 스킬"))
-	else:
-		feedback_label.text = "패링 성공! %s" % String(link.get("name", "링크 스킬"))
+	feedback_label.text = ("완벽 패링! " if is_perfect else "패링 성공! ") + String(link.get("name", "링크 스킬"))
 	_update_ui(feedback_label.text)
 
 func _on_attack_landed(damage: int) -> void:
@@ -114,9 +107,8 @@ func _on_dealer_basic_attack(damage: int) -> void:
 	_update_ui("딜러 평타 %d" % damage)
 
 func _on_link_skill_fired(_skill_name: String, damage: int, _perfect: bool) -> void:
-	if not combat_started:
-		return
-	boss.apply_damage(damage)
+	if combat_started:
+		boss.apply_damage(damage)
 
 func _berserker_bonus() -> float:
 	var ratio: float = float(tank.hp) / float(tank.max_hp)
@@ -137,6 +129,12 @@ func _update_ui(msg: String) -> void:
 	boss_hp_label.text = "보스 HP: %d/%d" % [boss.hp, boss.max_hp]
 	dealer_role_label.text = "현재 딜러: %s" % dealer.get_role_name()
 	berserker_label.text = "버서커 보너스: +%d%%" % int(_berserker_bonus() * 100.0)
+	tank_hp_bar.max_value = tank.max_hp
+	tank_hp_bar.value = tank.hp
+	dealer_hp_bar.max_value = dealer.max_hp
+	dealer_hp_bar.value = dealer.hp
+	boss_hp_bar.max_value = boss.max_hp
+	boss_hp_bar.value = boss.hp
 	feedback_label.text = msg
 	if tank.hp <= 0:
 		feedback_label.text = "전투 실패"

@@ -115,3 +115,14 @@ func _update_color() -> void:
 		Role.ROGUE: Color(1.0, 1.0, 0.5)
 	}
 	$DealerSprite.color = Color(color_table.get(role, Color(1.0, 0.7, 0.4)))
+	if has_node("WeaponIcon"):
+		var w: Polygon2D = $WeaponIcon
+		if role == Role.ARCHER:
+			w.color = Color(0.9, 0.85, 0.4)
+			w.polygon = PackedVector2Array(-2,-6, 2,-6, 2,6, -2,6)
+		elif role == Role.MAGE:
+			w.color = Color(0.6, 0.8, 1.0)
+			w.polygon = PackedVector2Array(-2,-6, 2,-6, 2,2, 5,5, -5,5, -2,2)
+		else:
+			w.color = Color(0.7, 0.9, 0.7)
+			w.polygon = PackedVector2Array(-1,-5, 1,-5, 4,4, -4,4)
