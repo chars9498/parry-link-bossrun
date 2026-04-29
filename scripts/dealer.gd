@@ -1,79 +1,117 @@
 extends CharacterBody2D
 class_name Dealer
 
+signal link_skill_fired(skill_name: String, damage: int, perfect: bool)
+signal basic_attack_fired(damage: int)
+
 enum Role { ARCHER, MAGE, ROGUE }
 
-signal basic_attack_fired(damage: int)
-signal link_skill_fired(name: String, damage: int, empowered: bool)
+var role: int = Role.ARCHER
+var hp: int = 100
+var max_hp: int = 100
+var stunned: bool = false
+var revive_gauge: float = 0.0
+var target: Node2D = null
 
-@export var max_hp := 100
-@export var follow_speed := 260.0
-@export var follow_distance := 30.0
+@export var follow_speed: float = 260.0
+@export var follow_distance: float = 30.0
 
-var hp := max_hp
-var role := Role.ARCHER
-var stunned := false
-var revive_gauge := 0.0
-var _tank: Tank
-var _boss: CharacterBody2D
-@onready var _basic_timer: Timer = $BasicAttackTimer
-
-func setup(tank: Tank, boss: CharacterBody2D) -> void:
-	_tank = tank
-	_boss = boss
+func setup(tank_target: Node2D, _boss: CharacterBody2D) -> void:
+	target = tank_target
 
 func _physics_process(_delta: float) -> void:
-	if _tank == null:
+	if target == null:
 		return
-	var dir := (_tank.global_position - global_position)
-	var target := _tank.global_position - dir.normalized() * follow_distance
-	velocity = (target - global_position) * 5.5
+	var offset: Vector2 = target.global_position - global_position
+	if offset.length() <= 0.001:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+	var follow_position: Vector2 = target.global_position - offset.normalized() * follow_distance
+	velocity = (follow_position - global_position) * 5.5
 	if velocity.length() > follow_speed:
 		velocity = velocity.normalized() * follow_speed
 	move_and_slide()
 
 func _on_basic_attack_timer_timeout() -> void:
-	if stunned or _boss == null:
+	if stunned:
 		return
-	emit_signal("basic_attack_fired", _basic_damage())
-
-func cycle_role() -> void:
-	role = (role + 1) % 3
-	_update_color()
+	emit_signal("basic_attack_fired", basic_damage())
 
 func set_role(new_role: int) -> void:
 	role = new_role
+	if role < 0:
+		role = 0
+	if role > 2:
+		role = 2
 	_update_color()
 
-func get_role_name() -> String:
-	return ["궁수", "마법사", "도적"][role]
+func cycle_role() -> void:
+	set_role((role + 1) % 3)
 
-func on_tank_hit(damage: int) -> void:
-	hp = max(hp - damage, 0)
+func take_shared_damage(amount: int) -> void:
+	hp = max(hp - amount, 0)
 	if hp == 0:
 		stunned = true
 
-func on_parry_while_stunned(amount: float) -> void:
+func add_revive_progress(amount: float) -> void:
 	if not stunned:
 		return
 	revive_gauge = min(revive_gauge + amount, 100.0)
 	if revive_gauge >= 100.0:
+		revive_gauge = 0.0
 		stunned = false
 		hp = int(max_hp * 0.5)
-		revive_gauge = 0.0
+
+func fire_link_skill(perfect: bool, berserker_bonus: float) -> Dictionary:
+	if stunned:
+		return {"name": "기절", "damage": 0, "perfect": false}
+
+	var name_table: Dictionary = {
+		Role.ARCHER: "관통 화살",
+		Role.MAGE: "화염 폭발",
+		Role.ROGUE: "그림자 찌르기"
+	}
+	var link_damage_table: Dictionary = {
+		Role.ARCHER: 28,
+		Role.MAGE: 34,
+		Role.ROGUE: 24
+	}
+
+	var skill_name: String = String(name_table.get(role, "관통 화살"))
+	var base_damage: int = int(link_damage_table.get(role, 24))
+	var perfect_bonus: float = 0.0
+	if perfect:
+		perfect_bonus = 0.6
+	var multiplier: float = 1.0 + berserker_bonus + perfect_bonus
+	var final_damage: int = int(round(float(base_damage) * multiplier))
+
+	emit_signal("link_skill_fired", skill_name, final_damage, perfect)
+	return {"name": skill_name, "damage": final_damage, "perfect": perfect}
 
 func trigger_link_skill(perfect: bool, berserker_bonus: float) -> Dictionary:
-	if stunned:
-		return {"name":"기절", "damage":0, "empowered":false}
-	var base: int = {Role.ARCHER: 28, Role.MAGE: 34, Role.ROGUE: 24}[role]
-	var mult: float = 1.0 + berserker_bonus + (0.6 if perfect else 0.0)
-var dmg: int = int(round(float(base) * mult))
-	var names := {Role.ARCHER:"관통 화살", Role.MAGE:"화염 폭발", Role.ROGUE:"그림자 찌르기"}
-	emit_signal("link_skill_fired", names[role], dmg, perfect)
-	return {"name":names[role], "damage":dmg, "empowered":perfect}
+	return fire_link_skill(perfect, berserker_bonus)
 
-func _basic_damage() -> int:
-	return {Role.ARCHER:8, Role.MAGE:10, Role.ROGUE:7}[role]
+func basic_damage() -> int:
+	var basic_table: Dictionary = {
+		Role.ARCHER: 8,
+		Role.MAGE: 10,
+		Role.ROGUE: 7
+	}
+	return int(basic_table.get(role, 7))
+
+func get_role_name() -> String:
+	var role_name_table: Dictionary = {
+		Role.ARCHER: "궁수",
+		Role.MAGE: "마법사",
+		Role.ROGUE: "도적"
+	}
+	return String(role_name_table.get(role, "궁수"))
 
 func _update_color() -> void:
-	$DealerSprite.color = [Color(1,0.7,0.4), Color(0.7,0.5,1), Color(1,1,0.5)][role]
+	var color_table: Dictionary = {
+		Role.ARCHER: Color(1.0, 0.7, 0.4),
+		Role.MAGE: Color(0.7, 0.5, 1.0),
+		Role.ROGUE: Color(1.0, 1.0, 0.5)
+	}
+	$DealerSprite.color = Color(color_table.get(role, Color(1.0, 0.7, 0.4)))
