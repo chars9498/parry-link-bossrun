@@ -72,12 +72,8 @@ func _compute_cells() -> void:
 		print("[ArtAtlas] dealer cell=", _dealer_cell)
 	if _slime_tex != null:
 		var ss: Vector2 = _slime_tex.get_size()
-		var cell_2x3: Vector2 = Vector2(max(ss.x / 3.0, 1.0), max(ss.y / 2.0, 1.0))
-		var cell_3x2: Vector2 = Vector2(max(ss.x / 2.0, 1.0), max(ss.y / 3.0, 1.0))
-		var score_2x3: int = _count_non_empty_cells(_slime_tex, 3, 2)
-		var score_3x2: int = _count_non_empty_cells(_slime_tex, 2, 3)
-		_slime_cell = cell_2x3 if score_2x3 >= score_3x2 else cell_3x2
-		print("[ArtAtlas] slime cell=", _slime_cell, " score2x3=", score_2x3, " score3x2=", score_3x2)
+		_slime_cell = Vector2(max(ss.x / 2.0, 1.0), max(ss.y / 3.0, 1.0))
+		print("[ArtAtlas] slime cell=", _slime_cell, " (2 cols x 3 rows)")
 
 func _apply_environment_art() -> void:
 	if _tiles_tex != null and _world.get_node_or_null("ArenaTileSprite") == null:
@@ -121,9 +117,9 @@ func _apply_character_art() -> void:
 	_parry_fx.visible = false
 	_parry_fx.z_index = 8
 
-	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), Vector2(1.6, 1.6), 6, "Tank")
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), Vector2(1.4, 1.4), 6, "Dealer")
-	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), Vector2(1.8, 1.8), 6, "Boss")
+	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 40.0), 6, "Tank")
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 34.0), 6, "Dealer")
+	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 120.0), 6, "Boss")
 
 	if _vfx_tex != null:
 		_parry_fx.texture = _vfx_tex
@@ -143,13 +139,16 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	if sp.region_enabled:
 		sp.region_rect = _safe_region_rect(tex, first_rect)
 		if not _region_has_visible_pixels(tex, sp.region_rect):
-			push_warning("[ArtAtlas] %s region seems empty: %s. Switching to full atlas debug." % [label, sp.region_rect])
-			sp.region_enabled = false
+			push_warning("[ArtAtlas] %s region seems empty: %s. Keeping fallback polygons." % [label, sp.region_rect])
+			_show_fallback(label)
+			return
 	sp.visible = true
 	sp.scale = scale_xy
 	sp.z_index = z
 	sp.modulate = Color(1, 1, 1, 1)
-	print("[ArtAtlas] %s sprite visible=%s scale=%s z=%s modulate=%s region_enabled=%s region=%s" % [label, sp.visible, sp.scale, sp.z_index, sp.modulate, sp.region_enabled, sp.region_rect])
+	var src_size: Vector2 = sp.region_rect.size if sp.region_enabled else tex.get_size()
+	var display_size: Vector2 = Vector2(src_size.x * sp.scale.x, src_size.y * sp.scale.y)
+	print("[ArtAtlas] %s sprite visible=%s scale=%s z=%s modulate=%s region_enabled=%s region=%s approx_display=%s" % [label, sp.visible, sp.scale, sp.z_index, sp.modulate, sp.region_enabled, sp.region_rect, display_size])
 	_hide_actor_fallback(label)
 
 func _connect_feedback() -> void:
@@ -243,6 +242,11 @@ func _safe_region_rect(tex: Texture2D, wanted: Rect2) -> Rect2:
 	var h: float = min(max(wanted.size.y, 1.0), max_h)
 	return Rect2(Vector2(px, py), Vector2(w, h))
 
+
+func _uniform_scale_for_target(cell: Vector2, target_pixels: float) -> Vector2:
+	var base: float = max(cell.y, 1.0)
+	var s: float = target_pixels / base
+	return Vector2(s, s)
 func _ensure_sprite(parent: Node, node_name: String) -> Sprite2D:
 	var existing: Node = parent.get_node_or_null(node_name)
 	if existing != null and existing is Sprite2D:
