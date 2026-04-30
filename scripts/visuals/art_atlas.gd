@@ -117,12 +117,14 @@ func _apply_character_art() -> void:
 	_parry_fx.visible = false
 	_parry_fx.z_index = 8
 
-	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 96.0), 30, "Tank")
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 80.0), 29, "Dealer")
+	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 128.0), 32, "Tank")
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 92.0), 30, "Dealer")
 	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 160.0), 25, "Boss")
-	_add_shadow(_tank, "TankShadow", Vector2(34, 14), 26)
-	_add_shadow(_dealer, "DealerShadow", Vector2(30, 12), 25)
-	_add_shadow(_boss, "BossShadow", Vector2(64, 22), 24)
+	_add_shadow(_tank, "TankShadow", Vector2(40, 16), 27)
+	_add_shadow(_dealer, "DealerShadow", Vector2(34, 14), 26)
+	_add_shadow(_boss, "BossShadow", Vector2(66, 24), 24)
+	_add_rim(_tank, _tank_sprite, "TankRim", 31)
+	_add_rim(_dealer, _dealer_sprite, "DealerRim", 29)
 
 	if _vfx_tex != null:
 		_parry_fx.texture = _vfx_tex
@@ -147,6 +149,12 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 			return
 	sp.visible = true
 	sp.scale = scale_xy
+	if label == "Tank":
+		sp.offset = Vector2(0, -6)
+	elif label == "Dealer":
+		sp.offset = Vector2(0, -4)
+	else:
+		sp.offset = Vector2(0, -6)
 	sp.z_index = z
 	sp.modulate = Color(1, 1, 1, 1)
 	var src_size: Vector2 = sp.region_rect.size if sp.region_enabled else tex.get_size()
@@ -250,6 +258,26 @@ func _uniform_scale_for_target(cell: Vector2, target_pixels: float) -> Vector2:
 	var base: float = max(cell.y, 1.0)
 	var s: float = target_pixels / base
 	return Vector2(s, s)
+func _add_rim(parent: Node2D, source: Sprite2D, name: String, z: int) -> void:
+	if source == null or source.texture == null:
+		return
+	var rim: Sprite2D
+	var existing: Node = parent.get_node_or_null(name)
+	if existing != null and existing is Sprite2D:
+		rim = existing as Sprite2D
+	else:
+		rim = Sprite2D.new()
+		rim.name = name
+		parent.add_child(rim)
+	rim.texture = source.texture
+	rim.region_enabled = source.region_enabled
+	rim.region_rect = source.region_rect
+	rim.scale = source.scale * 1.06
+	rim.offset = source.offset + Vector2(0, 1)
+	rim.modulate = Color(0.1, 0.1, 0.1, 0.45)
+	rim.z_index = z
+	rim.visible = source.visible
+
 func _add_shadow(parent: Node2D, name: String, radii: Vector2, z: int) -> void:
 	var existing: Node = parent.get_node_or_null(name)
 	if existing != null and existing is Polygon2D:
@@ -262,7 +290,7 @@ func _add_shadow(parent: Node2D, name: String, radii: Vector2, z: int) -> void:
 		var ang: float = TAU * float(i) / 16.0
 		pts.append(Vector2(cos(ang) * radii.x, sin(ang) * radii.y))
 	sh.polygon = pts
-	sh.color = Color(0.0, 0.0, 0.0, 0.40)
+	sh.color = Color(0.0, 0.0, 0.0, 0.52)
 	sh.position = Vector2(0, 12)
 	sh.z_index = z
 	parent.add_child(sh)
