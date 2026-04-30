@@ -29,12 +29,12 @@ var _boss_sprite: Sprite2D
 var _parry_fx: Sprite2D
 
 func _ready() -> void:
-	_tank_tex = load(TANK_ART_PATH) as Texture2D
-	_dealer_tex = load(DEALER_ART_PATH) as Texture2D
-	_slime_tex = load(SLIME_ART_PATH) as Texture2D
-	_vfx_tex = load(VFX_ART_PATH) as Texture2D
-	_props_tex = load(PROPS_ART_PATH) as Texture2D
-	_tiles_tex = load(TILESET_ART_PATH) as Texture2D
+	_tank_tex = _load_texture(TANK_ART_PATH, "Tank")
+	_dealer_tex = _load_texture(DEALER_ART_PATH, "Dealer")
+	_slime_tex = _load_texture(SLIME_ART_PATH, "KingSlime")
+	_vfx_tex = _load_texture(VFX_ART_PATH, "VFX")
+	_props_tex = _load_texture(PROPS_ART_PATH, "Props")
+	_tiles_tex = _load_texture(TILESET_ART_PATH, "Tileset")
 	_apply_environment_art()
 	_apply_character_art()
 	_connect_feedback()
@@ -43,13 +43,32 @@ func _process(_delta: float) -> void:
 	_update_dealer_role_region()
 	_update_boss_region()
 
+func _load_texture(path: String, label: String) -> Texture2D:
+	if not ResourceLoader.exists(path):
+		push_error("[ArtAtlas] Missing texture file for %s: %s" % [label, path])
+		return null
+	var res: Resource = load(path)
+	if res == null:
+		push_error("[ArtAtlas] Failed to load texture for %s: %s" % [label, path])
+		return null
+	if not (res is Texture2D):
+		push_error("[ArtAtlas] Loaded resource is not Texture2D for %s: %s" % [label, path])
+		return null
+	var tex: Texture2D = res as Texture2D
+	var tex_size: Vector2 = tex.get_size()
+	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
+		push_error("[ArtAtlas] Invalid texture size for %s: %s" % [label, path])
+		return null
+	print("[ArtAtlas] Loaded %s texture: %s (%sx%s)" % [label, path, int(tex_size.x), int(tex_size.y)])
+	return tex
+
 func _apply_environment_art() -> void:
 	if _tiles_tex != null and _world.get_node_or_null("ArenaTileSprite") == null:
 		var floor: Sprite2D = Sprite2D.new()
 		floor.name = "ArenaTileSprite"
 		floor.texture = _tiles_tex
 		floor.region_enabled = true
-		floor.region_rect = Rect2(Vector2(0, 0), Vector2(256, 256))
+		floor.region_rect = _safe_region_rect(_tiles_tex, Rect2(Vector2.ZERO, Vector2(256, 256)))
 		floor.centered = true
 		floor.position = Vector2(480, 270)
 		floor.scale = Vector2(3.75, 2.1)
@@ -65,23 +84,14 @@ func _apply_environment_art() -> void:
 			var prop: Sprite2D = Sprite2D.new()
 			prop.texture = _props_tex
 			prop.region_enabled = true
-			prop.region_rect = Rect2(Vector2(32 * (i % 3), 32 * int(i / 3)), CELL)
+			var wanted: Rect2 = Rect2(Vector2(32 * (i % 3), 32 * int(i / 3)), CELL)
+			prop.region_rect = _safe_region_rect(_props_tex, wanted)
 			prop.position = points[i]
 			prop.scale = Vector2(1.4, 1.4)
 			prop.z_index = -2
 			_decor.add_child(prop)
 
 func _apply_character_art() -> void:
-	_hide_polygon_node(_tank, "TankBody")
-	_hide_polygon_node(_tank, "Head")
-	_hide_polygon_node(_tank, "Shield")
-	_hide_polygon_node(_dealer, "DealerSprite")
-	_hide_polygon_node(_dealer, "WeaponIcon")
-	_hide_polygon_node(_boss, "BossBody")
-	_hide_polygon_node(_boss, "EyeL")
-	_hide_polygon_node(_boss, "EyeR")
-	_hide_polygon_node(_boss, "Crown")
-
 	_tank_sprite = _ensure_sprite(_tank, "TankArt")
 	_dealer_sprite = _ensure_sprite(_dealer, "DealerArt")
 	_boss_sprite = _ensure_sprite(_boss, "BossArt")
@@ -92,22 +102,31 @@ func _apply_character_art() -> void:
 	if _tank_tex != null:
 		_tank_sprite.texture = _tank_tex
 		_tank_sprite.region_enabled = true
-		_tank_sprite.region_rect = Rect2(Vector2(0, 0), CELL)
+		_tank_sprite.region_rect = _safe_region_rect(_tank_tex, Rect2(Vector2.ZERO, CELL))
 		_tank_sprite.scale = Vector2(1.6, 1.6)
+		_hide_polygon_node(_tank, "TankBody")
+		_hide_polygon_node(_tank, "Head")
+		_hide_polygon_node(_tank, "Shield")
 	if _dealer_tex != null:
 		_dealer_sprite.texture = _dealer_tex
 		_dealer_sprite.region_enabled = true
 		_dealer_sprite.scale = Vector2(1.4, 1.4)
 		_update_dealer_role_region()
+		_hide_polygon_node(_dealer, "DealerSprite")
+		_hide_polygon_node(_dealer, "WeaponIcon")
 	if _slime_tex != null:
 		_boss_sprite.texture = _slime_tex
 		_boss_sprite.region_enabled = true
-		_boss_sprite.region_rect = Rect2(Vector2(0, 0), Vector2(64, 64))
+		_boss_sprite.region_rect = _safe_region_rect(_slime_tex, Rect2(Vector2.ZERO, Vector2(64, 64)))
 		_boss_sprite.scale = Vector2(1.8, 1.8)
+		_hide_polygon_node(_boss, "BossBody")
+		_hide_polygon_node(_boss, "EyeL")
+		_hide_polygon_node(_boss, "EyeR")
+		_hide_polygon_node(_boss, "Crown")
 	if _vfx_tex != null:
 		_parry_fx.texture = _vfx_tex
 		_parry_fx.region_enabled = true
-		_parry_fx.region_rect = Rect2(Vector2(0, 0), CELL)
+		_parry_fx.region_rect = _safe_region_rect(_vfx_tex, Rect2(Vector2.ZERO, CELL))
 		_parry_fx.scale = Vector2(1.6, 1.6)
 
 func _connect_feedback() -> void:
@@ -124,10 +143,10 @@ func _on_tank_parry_attempted() -> void:
 	var result: int = tank_script.get_parry_result()
 	_parry_fx.visible = true
 	if result == ParryTypes.Result.PERFECT:
-		_parry_fx.region_rect = Rect2(Vector2(32, 0), CELL)
+		_parry_fx.region_rect = _safe_region_rect(_vfx_tex, Rect2(Vector2(32, 0), CELL))
 		_parry_fx.scale = Vector2(2.1, 2.1)
 	else:
-		_parry_fx.region_rect = Rect2(Vector2(0, 0), CELL)
+		_parry_fx.region_rect = _safe_region_rect(_vfx_tex, Rect2(Vector2(0, 0), CELL))
 		_parry_fx.scale = Vector2(1.6, 1.6)
 	await get_tree().create_timer(0.12).timeout
 	_parry_fx.visible = false
@@ -142,7 +161,7 @@ func _update_dealer_role_region() -> void:
 		rect.position = Vector2(32, 0)
 	else:
 		rect.position = Vector2(64, 0)
-	_dealer_sprite.region_rect = rect
+	_dealer_sprite.region_rect = _safe_region_rect(_dealer_tex, rect)
 
 func _update_boss_region() -> void:
 	if _slime_tex == null or _boss_sprite == null:
@@ -153,12 +172,22 @@ func _update_boss_region() -> void:
 	var speed_len: float = slime.velocity.length()
 	var body: Node = slime.get_node("BossBody")
 	if body is CanvasItem and not (body as CanvasItem).visible:
-		_boss_sprite.region_rect = Rect2(Vector2(128, 0), Vector2(64, 64))
+		_boss_sprite.region_rect = _safe_region_rect(_slime_tex, Rect2(Vector2(128, 0), Vector2(64, 64)))
 		return
 	if speed_len > 250.0:
-		_boss_sprite.region_rect = Rect2(Vector2(64, 0), Vector2(64, 64))
+		_boss_sprite.region_rect = _safe_region_rect(_slime_tex, Rect2(Vector2(64, 0), Vector2(64, 64)))
 		return
-	_boss_sprite.region_rect = Rect2(Vector2(0, 0), Vector2(64, 64))
+	_boss_sprite.region_rect = _safe_region_rect(_slime_tex, Rect2(Vector2(0, 0), Vector2(64, 64)))
+
+func _safe_region_rect(tex: Texture2D, wanted: Rect2) -> Rect2:
+	var tex_size: Vector2 = tex.get_size()
+	var px: float = clamp(wanted.position.x, 0.0, max(tex_size.x - 1.0, 0.0))
+	var py: float = clamp(wanted.position.y, 0.0, max(tex_size.y - 1.0, 0.0))
+	var max_w: float = max(tex_size.x - px, 1.0)
+	var max_h: float = max(tex_size.y - py, 1.0)
+	var w: float = min(wanted.size.x, max_w)
+	var h: float = min(wanted.size.y, max_h)
+	return Rect2(Vector2(px, py), Vector2(w, h))
 
 func _ensure_sprite(parent: Node, node_name: String) -> Sprite2D:
 	var existing: Node = parent.get_node_or_null(node_name)
