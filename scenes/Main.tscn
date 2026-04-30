@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/tank.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/dealer.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/boss/king_slime.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/visuals/arena_visuals.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/visuals/art_atlas.gd" id="6"]
 
 [sub_resource type="CircleShape2D" id="1"]
 radius = 12.0
@@ -119,6 +120,10 @@ autostart = true
 enabled = true
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0
+
+
+[node name="ArtDirector" type="Node2D" parent="."]
+script = ExtResource("6")
 
 [node name="UI" type="CanvasLayer" parent="."]
 
