@@ -117,9 +117,12 @@ func _apply_character_art() -> void:
 	_parry_fx.visible = false
 	_parry_fx.z_index = 8
 
-	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 40.0), 6, "Tank")
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 34.0), 6, "Dealer")
-	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 120.0), 6, "Boss")
+	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 64.0), 20, "Tank")
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 56.0), 19, "Dealer")
+	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 150.0), 18, "Boss")
+	_add_shadow(_tank, "TankShadow", Vector2(26, 10), 16)
+	_add_shadow(_dealer, "DealerShadow", Vector2(22, 9), 15)
+	_add_shadow(_boss, "BossShadow", Vector2(56, 18), 14)
 
 	if _vfx_tex != null:
 		_parry_fx.texture = _vfx_tex
@@ -247,6 +250,23 @@ func _uniform_scale_for_target(cell: Vector2, target_pixels: float) -> Vector2:
 	var base: float = max(cell.y, 1.0)
 	var s: float = target_pixels / base
 	return Vector2(s, s)
+func _add_shadow(parent: Node2D, name: String, radii: Vector2, z: int) -> void:
+	var existing: Node = parent.get_node_or_null(name)
+	if existing != null and existing is Polygon2D:
+		(existing as Polygon2D).visible = true
+		return
+	var sh: Polygon2D = Polygon2D.new()
+	sh.name = name
+	var pts: PackedVector2Array = PackedVector2Array()
+	for i in range(16):
+		var ang: float = TAU * float(i) / 16.0
+		pts.append(Vector2(cos(ang) * radii.x, sin(ang) * radii.y))
+	sh.polygon = pts
+	sh.color = Color(0.0, 0.0, 0.0, 0.28)
+	sh.position = Vector2(0, 12)
+	sh.z_index = z
+	parent.add_child(sh)
+
 func _ensure_sprite(parent: Node, node_name: String) -> Sprite2D:
 	var existing: Node = parent.get_node_or_null(node_name)
 	if existing != null and existing is Sprite2D:
