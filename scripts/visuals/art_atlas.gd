@@ -117,12 +117,12 @@ func _apply_character_art() -> void:
 	_parry_fx.visible = false
 	_parry_fx.z_index = 8
 
-	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 64.0), 20, "Tank")
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 56.0), 19, "Dealer")
-	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 150.0), 18, "Boss")
-	_add_shadow(_tank, "TankShadow", Vector2(26, 10), 16)
-	_add_shadow(_dealer, "DealerShadow", Vector2(22, 9), 15)
-	_add_shadow(_boss, "BossShadow", Vector2(56, 18), 14)
+	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 96.0), 30, "Tank")
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 80.0), 29, "Dealer")
+	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 160.0), 25, "Boss")
+	_add_shadow(_tank, "TankShadow", Vector2(34, 14), 26)
+	_add_shadow(_dealer, "DealerShadow", Vector2(30, 12), 25)
+	_add_shadow(_boss, "BossShadow", Vector2(64, 22), 24)
 
 	if _vfx_tex != null:
 		_parry_fx.texture = _vfx_tex
@@ -262,7 +262,7 @@ func _add_shadow(parent: Node2D, name: String, radii: Vector2, z: int) -> void:
 		var ang: float = TAU * float(i) / 16.0
 		pts.append(Vector2(cos(ang) * radii.x, sin(ang) * radii.y))
 	sh.polygon = pts
-	sh.color = Color(0.0, 0.0, 0.0, 0.28)
+	sh.color = Color(0.0, 0.0, 0.0, 0.40)
 	sh.position = Vector2(0, 12)
 	sh.z_index = z
 	parent.add_child(sh)
