@@ -118,7 +118,7 @@ func _apply_character_art() -> void:
 	_parry_fx.z_index = 8
 
 	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 128.0), 32, "Tank")
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 92.0), 30, "Dealer")
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 98.0), 30, "Dealer")
 	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 160.0), 25, "Boss")
 	_add_shadow(_tank, "TankShadow", Vector2(40, 16), 27)
 	_add_shadow(_dealer, "DealerShadow", Vector2(34, 14), 26)
@@ -142,7 +142,14 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	sp.texture = tex
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
-		sp.region_rect = _safe_region_rect(tex, first_rect)
+		var base_rect: Rect2 = _safe_region_rect(tex, first_rect)
+		var tight_rect: Rect2 = _tight_alpha_rect(tex, base_rect, 2)
+		if label == "Tank":
+			sp.region_rect = tight_rect
+		elif label == "Dealer":
+			sp.region_rect = _blend_rect(base_rect, tight_rect, 0.55)
+		else:
+			sp.region_rect = base_rect
 		if not _region_has_visible_pixels(tex, sp.region_rect):
 			push_warning("[ArtAtlas] %s region seems empty: %s. Keeping fallback polygons." % [label, sp.region_rect])
 			_show_fallback(label)
@@ -150,9 +157,9 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	sp.visible = true
 	sp.scale = scale_xy
 	if label == "Tank":
-		sp.offset = Vector2(0, -6)
+		sp.offset = Vector2(0, -7)
 	elif label == "Dealer":
-		sp.offset = Vector2(0, -4)
+		sp.offset = Vector2(2, -5)
 	else:
 		sp.offset = Vector2(0, -6)
 	sp.z_index = z
@@ -225,6 +232,43 @@ func _count_non_empty_cells(tex: Texture2D, cols: int, rows: int) -> int:
 			if _region_has_visible_pixels(tex, rect):
 				count += 1
 	return count
+
+func _tight_alpha_rect(tex: Texture2D, rect: Rect2, padding: int) -> Rect2:
+	var img: Image = tex.get_image()
+	if img == null:
+		return rect
+	var safe: Rect2 = _safe_region_rect(tex, rect)
+	var sx: int = int(safe.position.x)
+	var sy: int = int(safe.position.y)
+	var ex: int = int(safe.position.x + safe.size.x)
+	var ey: int = int(safe.position.y + safe.size.y)
+	var min_x: int = ex
+	var min_y: int = ey
+	var max_x: int = sx
+	var max_y: int = sy
+	var found: bool = false
+	for py in range(sy, ey):
+		for px in range(sx, ex):
+			if img.get_pixel(px, py).a > 0.06:
+				found = true
+				min_x = min(min_x, px)
+				min_y = min(min_y, py)
+				max_x = max(max_x, px)
+				max_y = max(max_y, py)
+	if not found:
+		return safe
+	var p: int = max(padding, 0)
+	var rx: float = float(max(min_x - p, sx))
+	var ry: float = float(max(min_y - p, sy))
+	var rw: float = float(min(max_x + p + 1, ex) - int(rx))
+	var rh: float = float(min(max_y + p + 1, ey) - int(ry))
+	return _safe_region_rect(tex, Rect2(Vector2(rx, ry), Vector2(rw, rh)))
+
+func _blend_rect(a: Rect2, b: Rect2, t: float) -> Rect2:
+	var clamped_t: float = clamp(t, 0.0, 1.0)
+	var pos: Vector2 = a.position.lerp(b.position, clamped_t)
+	var size: Vector2 = a.size.lerp(b.size, clamped_t)
+	return Rect2(pos, size)
 
 func _region_has_visible_pixels(tex: Texture2D, rect: Rect2) -> bool:
 	var img: Image = tex.get_image()
