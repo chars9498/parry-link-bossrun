@@ -82,6 +82,7 @@ func _ready() -> void:
 		_archer_anim_tex = _load_texture(ARCHER_ANIM_PATH, "ArcherAnim")
 		_slime_anim_tex = _load_texture(SLIME_ANIM_PATH, "SlimeAnim")
 		_log_anim_sheet_sizes()
+	print("[ArtAtlas] use_anim_sheets=", use_anim_sheets)
 	_compute_cells()
 	_apply_environment_art()
 	_apply_character_art()
@@ -156,7 +157,7 @@ func _apply_environment_art() -> void:
 
 func _apply_character_art() -> void:
 	_tank_sprite = _ensure_sprite(_tank, "ArtTankSprite")
-	_dealer_sprite = _ensure_sprite(_dealer, "DealerArt")
+	_dealer_sprite = _ensure_sprite(_dealer, "ArtDealerSprite")
 	_boss_sprite = _ensure_sprite(_boss, "BossArt")
 	_parry_fx = _ensure_sprite(_tank, "ParryFX")
 	_parry_fx.visible = false
@@ -185,23 +186,31 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 		_show_fallback("Tank")
 		return
 	sp.texture = _tank_anim_tex if use_anim_sheets and _tank_anim_tex != null else tex
-	sp.region_enabled = not debug_show_full_atlas
-	if sp.region_enabled:
+	sp.region_enabled = true
+	if sp.texture == null:
+		_show_fallback("Tank")
+		return
+	if use_anim_sheets:
 		var active_tex: Texture2D = sp.texture
 		var origin: Vector2 = Vector2(float(tank_frame_origin_x), float(tank_frame_origin_y))
 		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(origin, _cell_size_for(active_tex, TANK_COLS, TANK_ROWS, tank_cell_w, tank_cell_h)))
 		var tight_rect: Rect2 = _tight_alpha_rect(active_tex, base_rect, 2)
 		sp.region_rect = tight_rect
-		if not _region_has_visible_pixels(active_tex, sp.region_rect):
-			push_warning("[ArtAtlas] TANK region empty: %s" % [sp.region_rect])
-			_show_fallback("Tank")
-			return
+	else:
+		sp.region_rect = _safe_region_rect(tex, Rect2(Vector2.ZERO, _tank_cell))
+	if not _region_has_visible_pixels(sp.texture, sp.region_rect):
+		push_warning("[ArtAtlas] TANK region empty: %s" % [sp.region_rect])
+		_show_fallback("Tank")
+		return
 	sp.visible = true
 	sp.offset = Vector2(0, -8)
 	var final_scale: Vector2 = base_scale * tank_visual_multiplier
 	sp.scale = final_scale
 	sp.z_index = z
 	sp.modulate = Color(1, 1, 1, 1)
+	print("[ArtAtlas] Tank texture path actually used=", sp.texture.resource_path if sp.texture != null else "null")
+	print("[ArtAtlas] Tank sprite parent node path=", sp.get_parent().get_path())
+	print("[ArtAtlas] Tank sprite visible=", sp.visible, " texture_null=", sp.texture == null, " scale=", sp.scale, " region=", sp.region_rect)
 	print("[ArtAtlas] TANK texture size=", tex.get_size())
 	print("[ArtAtlas] TANK origin_x/y=", tank_frame_origin_x, "/", tank_frame_origin_y)
 	print("[ArtAtlas] TANK cell_w/h=", tank_cell_w, "/", tank_cell_h)
@@ -223,23 +232,27 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 		sp.texture = _slime_anim_tex
 	else:
 		sp.texture = tex
-	sp.region_enabled = not debug_show_full_atlas
-	if sp.region_enabled:
+	sp.region_enabled = true
+	if sp.texture == null:
+		_show_fallback(label)
+		return
+	if use_anim_sheets:
 		var active_tex: Texture2D = sp.texture
 		var base_size: Vector2 = _cell_size_for(active_tex, ARCHER_COLS if label == "Dealer" else SLIME_COLS if label == "Boss" else TANK_COLS, ARCHER_ROWS if label == "Dealer" else SLIME_ROWS if label == "Boss" else TANK_ROWS, archer_cell_w if label == "Dealer" else slime_cell_w if label == "Boss" else tank_cell_w, archer_cell_h if label == "Dealer" else slime_cell_h if label == "Boss" else tank_cell_h)
 		var origin: Vector2 = Vector2(float(archer_frame_origin_x), float(archer_frame_origin_y)) if label == "Dealer" else Vector2(float(slime_frame_origin_x), float(slime_frame_origin_y)) if label == "Boss" else Vector2(float(tank_frame_origin_x), float(tank_frame_origin_y))
-		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(origin, base_size))
-		var tight_rect: Rect2 = _tight_alpha_rect(active_tex, base_rect, 2)
-		if label == "Tank":
-			sp.region_rect = tight_rect
-		elif label == "Dealer":
-			sp.region_rect = _blend_rect(base_rect, tight_rect, 0.55)
+		sp.region_rect = _safe_region_rect(active_tex, Rect2(origin, base_size))
+	else:
+		if label == "Dealer":
+			var role_row: int = _dealer.role
+			sp.region_rect = _safe_region_rect(tex, Rect2(Vector2(0, float(role_row) * _dealer_cell.y), _dealer_cell))
+		elif label == "Boss":
+			sp.region_rect = _safe_region_rect(tex, Rect2(Vector2.ZERO, _slime_cell))
 		else:
-			sp.region_rect = base_rect
-		if not _region_has_visible_pixels(active_tex, sp.region_rect):
-			push_warning("[ArtAtlas] %s region seems empty: %s. Keeping fallback polygons." % [label, sp.region_rect])
-			_show_fallback(label)
-			return
+			sp.region_rect = _safe_region_rect(tex, Rect2(Vector2.ZERO, _tank_cell))
+	if not _region_has_visible_pixels(sp.texture, sp.region_rect):
+		push_warning("[ArtAtlas] %s region seems empty: %s. Keeping fallback polygons." % [label, sp.region_rect])
+		_show_fallback(label)
+		return
 	sp.visible = true
 	sp.scale = scale_xy
 	if label == "Tank":
@@ -253,6 +266,12 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	var src_size: Vector2 = sp.region_rect.size if sp.region_enabled else tex.get_size()
 	var display_size: Vector2 = Vector2(src_size.x * sp.scale.x, src_size.y * sp.scale.y)
 	print("[ArtAtlas] %s sprite visible=%s scale=%s z=%s modulate=%s region_enabled=%s region=%s approx_display=%s" % [label, sp.visible, sp.scale, sp.z_index, sp.modulate, sp.region_enabled, sp.region_rect, display_size])
+	if label == "Dealer":
+		print("[ArtAtlas] Dealer texture path actually used=", sp.texture.resource_path if sp.texture != null else "null")
+		print("[ArtAtlas] Dealer sprite parent node path=", sp.get_parent().get_path())
+		print("[ArtAtlas] Dealer sprite visible=", sp.visible, " texture_null=", sp.texture == null, " scale=", sp.scale, " region=", sp.region_rect)
+	elif label == "Boss":
+		print("[ArtAtlas] Boss texture path actually used=", sp.texture.resource_path if sp.texture != null else "null")
 	if label == "Dealer":
 		print("[ArtAtlas] ARCHER origin_x/y=", archer_frame_origin_x, "/", archer_frame_origin_y)
 		print("[ArtAtlas] ARCHER cell_w/h=", archer_cell_w, "/", archer_cell_h)
