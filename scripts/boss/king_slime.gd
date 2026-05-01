@@ -23,6 +23,11 @@ signal attack_landed(base_damage: int)
 @export var crown_angle_deg: float = 65.0
 @export var parry_pre_grace: float = 0.12
 @export var parry_post_grace: float = 0.12
+@export var spit_lifetime: float = 3.6
+@export var spit_max_distance: float = 2100.0
+@export var spit_speed: float = 175.0
+@export var dash_distance: float = 320.0
+@export var dash_duration: float = 0.62
 var hp: int = max_hp
 
 var _tank: Tank
@@ -45,6 +50,9 @@ var _hitbox_active: bool = false
 var _hitbox_active_t: float = 0.0
 var _hitbox_active_total: float = 0.12
 var _parry_grace_active: bool = false
+var _slam_air_arc: float = 0.0
+var _slam_warn_t: float = 0.0
+var _slam_ring_flash: float = 0.0
 
 @onready var timer: Timer = $PatternTimer
 @onready var body: Polygon2D = $BossBody
@@ -77,7 +85,7 @@ func _physics_process(delta: float) -> void:
 			_projectile_active = false
 		elif debug_log_hit_checks and int(Time.get_ticks_msec()) % 100 < 16:
 			_log_hit_check("SPIT", spit_distance, spit_threshold, spit_parry_threshold, false, false, "global/global")
-		if _projectile_pos.distance_to(global_position) > 700.0:
+		if _projectile_pos.distance_to(global_position) > spit_max_distance:
 			_projectile_active = false
 	if _strike_flash_t > 0.0:
 		_strike_flash_t -= delta
@@ -87,6 +95,10 @@ func _physics_process(delta: float) -> void:
 		_hitbox_active_t += delta
 		if _hitbox_active_t >= _hitbox_active_total:
 			_hitbox_active = false
+	if _slam_warn_t > 0.0:
+		_slam_warn_t -= delta
+	if _slam_ring_flash > 0.0:
+		_slam_ring_flash -= delta
 	queue_redraw()
 
 func _draw() -> void:
@@ -96,8 +108,22 @@ func _draw() -> void:
 		draw_circle(_projectile_pos - global_position, spit_hit_radius, Color(0.4, 1.0, 0.55, 0.18))
 	if _strike_flash_t > 0.0:
 		draw_circle(Vector2.ZERO, 48.0, Color(1.0, 0.95, 0.5, 0.25))
+	_draw_slam_visuals()
 	if debug_draw_hitboxes:
 		_draw_debug_hitboxes()
+
+func _draw_slam_visuals() -> void:
+	if _state == BossState.ATTACK and _current_pattern() == Pattern.SLAM:
+		var shadow_scale: float = lerp(0.45, 1.0, 1.0 - _slam_air_arc)
+		var shadow_alpha: float = lerp(0.18, 0.34, 1.0 - _slam_air_arc)
+		draw_circle(Vector2.ZERO, slam_radius * shadow_scale, Color(0.08, 0.1, 0.12, shadow_alpha))
+		var blink: float = 0.22 if _slam_warn_t > 0.0 and int(Time.get_ticks_msec() / 60) % 2 == 0 else 0.0
+		var warn_alpha: float = 0.18 + blink
+		draw_circle(_slam_target - global_position, slam_radius, Color(1.0, 0.3, 0.2, warn_alpha))
+		draw_arc(_slam_target - global_position, slam_radius + 8.0, 0.0, TAU, 40, Color(1.0, 0.95, 0.45, warn_alpha + 0.12), 3.0)
+	if _slam_ring_flash > 0.0:
+		var flash_r: float = slam_radius + (1.0 - _slam_ring_flash / 0.22) * 26.0
+		draw_arc(Vector2.ZERO, flash_r, 0.0, TAU, 44, Color(1.0, 1.0, 1.0, _slam_ring_flash), 6.0)
 
 func _draw_telegraph() -> void:
 	if _telegraph_type < 0:
@@ -161,13 +187,12 @@ func _pattern_charge() -> void:
 	await _open_parry_grace_window(parry_pre_grace)
 	_state = BossState.ATTACK
 	var dash_start: Vector2 = global_position
-	var dash_target: Vector2 = dash_start + _attack_dir * 160.0
-	var dash_duration: float = 0.40
+	var dash_target: Vector2 = dash_start + _attack_dir * dash_distance
 	var elapsed: float = 0.0
 	while elapsed < dash_duration:
 		var t: float = elapsed / dash_duration
 		global_position = dash_start.lerp(dash_target, t)
-		body.scale = Vector2(1.06 + t * 0.08, 0.94 - t * 0.08)
+		body.scale = Vector2(1.08 + t * 0.18, 0.92 - t * 0.12)
 		if t >= 0.72 and not _hitbox_active:
 			_enable_hitbox_window(0.12)
 		var charge_distance: float = global_position.distance_to(_tank.global_position)
@@ -183,6 +208,8 @@ func _pattern_charge() -> void:
 			_apply_hit_once(18)
 		elif debug_log_hit_checks and _hitbox_active:
 			_log_hit_check("CHARGE", charge_distance, charge_threshold, charge_parry_threshold, false, false, "global/global")
+		if _can_parry_now() and int(Time.get_ticks_msec() / 70) % 2 == 0:
+			_strike_flash_t = max(_strike_flash_t, 0.03)
 		await get_tree().physics_frame
 		elapsed += 1.0 / 60.0
 	global_position = dash_target
@@ -202,9 +229,12 @@ func _pattern_slam() -> void:
 	while elapsed < jump_duration:
 		var t: float = elapsed / jump_duration
 		var arc: float = sin(t * PI)
+		_slam_air_arc = arc
 		global_position = jump_start.lerp(_slam_target, t)
-		body.position.y = -arc * 24.0
-		body.scale = Vector2(1.0 + arc * 0.1, 1.0 - arc * 0.1)
+		body.position.y = -arc * 42.0
+		body.scale = Vector2(1.0 + arc * 0.24, 1.0 - arc * 0.16)
+		if t >= 0.74:
+			_slam_warn_t = 0.16
 		if t >= 0.88 and not _hitbox_active:
 			_enable_hitbox_window(0.10)
 		var slam_distance: float = global_position.distance_to(_tank.global_position)
@@ -225,6 +255,8 @@ func _pattern_slam() -> void:
 	global_position = _slam_target
 	body.position = Vector2.ZERO
 	body.scale = Vector2.ONE
+	_slam_air_arc = 0.0
+	_slam_ring_flash = 0.22
 	_strike_flash_t = 0.12
 	_parry_grace_active = false
 	_state = BossState.RECOVER
@@ -237,8 +269,8 @@ func _pattern_spit() -> void:
 	_enable_hitbox_window(0.12)
 	_projectile_active = true
 	_projectile_pos = global_position
-	_projectile_vel = (_tank.global_position - global_position).normalized() * 170.0
-	await get_tree().create_timer(1.2).timeout
+	_projectile_vel = (_tank.global_position - global_position).normalized() * spit_speed
+	await get_tree().create_timer(spit_lifetime).timeout
 	_projectile_active = false
 	_parry_grace_active = false
 	_state = BossState.RECOVER
