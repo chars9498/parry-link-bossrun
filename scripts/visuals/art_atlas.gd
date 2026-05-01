@@ -9,6 +9,8 @@ const PROPS_ART_PATH: String = "res://assets/art/props_reference.png"
 const TILESET_ART_PATH: String = "res://assets/art/tileset_reference.png"
 
 @export var debug_show_full_atlas: bool = false
+@export var tank_visual_multiplier: float = 2.8
+@export var dealer_visual_multiplier: float = 0.8
 
 var _tank_tex: Texture2D
 var _dealer_tex: Texture2D
@@ -110,15 +112,15 @@ func _apply_environment_art() -> void:
 			_decor.add_child(prop)
 
 func _apply_character_art() -> void:
-	_tank_sprite = _ensure_sprite(_tank, "TankArt")
+	_tank_sprite = _ensure_sprite(_tank, "ArtTankSprite")
 	_dealer_sprite = _ensure_sprite(_dealer, "DealerArt")
 	_boss_sprite = _ensure_sprite(_boss, "BossArt")
 	_parry_fx = _ensure_sprite(_tank, "ParryFX")
 	_parry_fx.visible = false
 	_parry_fx.z_index = 8
 
-	_apply_actor_texture(_tank_sprite, _tank_tex, _tank_cell, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 128.0), 32, "Tank")
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 98.0), 30, "Dealer")
+	_apply_tank_texture(_tank_sprite, _tank_tex, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 160.0), 32)
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 76.0), 30, "Dealer")
 	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 160.0), 25, "Boss")
 	_add_shadow(_tank, "TankShadow", Vector2(40, 16), 27)
 	_add_shadow(_dealer, "DealerShadow", Vector2(34, 14), 26)
@@ -133,6 +135,35 @@ func _apply_character_art() -> void:
 		_parry_fx.scale = Vector2(1.6, 1.6)
 		_parry_fx.visible = false
 		_parry_fx.modulate = Color(1, 1, 1, 1)
+
+func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_scale: Vector2, z: int) -> void:
+	if tex == null:
+		print("[ArtAtlas] TANK texture null -> keep fallback polygons")
+		_show_fallback("Tank")
+		return
+	sp.texture = tex
+	sp.region_enabled = not debug_show_full_atlas
+	if sp.region_enabled:
+		var base_rect: Rect2 = _safe_region_rect(tex, first_rect)
+		var tight_rect: Rect2 = _tight_alpha_rect(tex, base_rect, 2)
+		sp.region_rect = tight_rect
+		if not _region_has_visible_pixels(tex, sp.region_rect):
+			push_warning("[ArtAtlas] TANK region empty: %s" % [sp.region_rect])
+			_show_fallback("Tank")
+			return
+	sp.visible = true
+	sp.offset = Vector2(0, -14)
+	var final_scale: Vector2 = base_scale * tank_visual_multiplier
+	sp.scale = final_scale
+	sp.z_index = z
+	sp.modulate = Color(1, 1, 1, 1)
+	print("[ArtAtlas] TANK texture size=", tex.get_size())
+	print("[ArtAtlas] TANK region=", sp.region_rect)
+	print("[ArtAtlas] TANK base_scale=", base_scale)
+	print("[ArtAtlas] TANK visual_multiplier=", tank_visual_multiplier)
+	print("[ArtAtlas] TANK final_scale=", final_scale)
+	print("[ArtAtlas] TANK sprite.scale after assignment=", sp.scale, " name=", sp.name)
+	_hide_actor_fallback("Tank")
 
 func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rect: Rect2, scale_xy: Vector2, z: int, label: String) -> void:
 	if tex == null:
@@ -167,6 +198,10 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	var src_size: Vector2 = sp.region_rect.size if sp.region_enabled else tex.get_size()
 	var display_size: Vector2 = Vector2(src_size.x * sp.scale.x, src_size.y * sp.scale.y)
 	print("[ArtAtlas] %s sprite visible=%s scale=%s z=%s modulate=%s region_enabled=%s region=%s approx_display=%s" % [label, sp.visible, sp.scale, sp.z_index, sp.modulate, sp.region_enabled, sp.region_rect, display_size])
+	if label == "Dealer":
+		print("[ArtAtlas] DEALER final_scale=", sp.scale)
+	elif label == "Boss":
+		print("[ArtAtlas] SLIME final_scale=", sp.scale)
 	_hide_actor_fallback(label)
 
 func _connect_feedback() -> void:
