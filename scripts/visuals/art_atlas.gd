@@ -7,6 +7,16 @@ const SLIME_ART_PATH: String = "res://assets/art/king_slime_reference.png"
 const VFX_ART_PATH: String = "res://assets/art/vfx_reference.png"
 const PROPS_ART_PATH: String = "res://assets/art/props_reference.png"
 const TILESET_ART_PATH: String = "res://assets/art/tileset_reference.png"
+const TANK_ANIM_PATH: String = "res://assets/art/tank_anim_sheet.png"
+const ARCHER_ANIM_PATH: String = "res://assets/art/archer_anim_sheet.png"
+const SLIME_ANIM_PATH: String = "res://assets/art/king_slime_anim_sheet.png"
+
+const TANK_COLS: int = 8
+const TANK_ROWS: int = 8
+const ARCHER_COLS: int = 8
+const ARCHER_ROWS: int = 6
+const SLIME_COLS: int = 6
+const SLIME_ROWS: int = 4
 
 @export var debug_show_full_atlas: bool = false
 @export var tank_visual_multiplier: float = 2.8
@@ -18,6 +28,9 @@ var _slime_tex: Texture2D
 var _vfx_tex: Texture2D
 var _props_tex: Texture2D
 var _tiles_tex: Texture2D
+var _tank_anim_tex: Texture2D
+var _archer_anim_tex: Texture2D
+var _slime_anim_tex: Texture2D
 
 var _tank_cell: Vector2 = Vector2.ZERO
 var _dealer_cell: Vector2 = Vector2.ZERO
@@ -33,6 +46,15 @@ var _tank_sprite: Sprite2D
 var _dealer_sprite: Sprite2D
 var _boss_sprite: Sprite2D
 var _parry_fx: Sprite2D
+var _tank_anim_state: String = "idle"
+var _archer_anim_state: String = "idle"
+var _slime_anim_state: String = "idle"
+var _tank_anim_t: float = 0.0
+var _archer_anim_t: float = 0.0
+var _slime_anim_t: float = 0.0
+var _tank_frame: int = 0
+var _archer_frame: int = 0
+var _slime_frame: int = 0
 
 func _ready() -> void:
 	_tank_tex = _load_texture(TANK_ART_PATH, "Tank")
@@ -41,14 +63,18 @@ func _ready() -> void:
 	_vfx_tex = _load_texture(VFX_ART_PATH, "VFX")
 	_props_tex = _load_texture(PROPS_ART_PATH, "Props")
 	_tiles_tex = _load_texture(TILESET_ART_PATH, "Tileset")
+	_tank_anim_tex = _load_texture(TANK_ANIM_PATH, "TankAnim")
+	_archer_anim_tex = _load_texture(ARCHER_ANIM_PATH, "ArcherAnim")
+	_slime_anim_tex = _load_texture(SLIME_ANIM_PATH, "SlimeAnim")
 	_compute_cells()
 	_apply_environment_art()
 	_apply_character_art()
 	_connect_feedback()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_update_dealer_role_region()
 	_update_boss_region()
+	_update_animation_states(delta)
 
 func _load_texture(path: String, label: String) -> Texture2D:
 	if not ResourceLoader.exists(path):
@@ -141,7 +167,7 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 		print("[ArtAtlas] TANK texture null -> keep fallback polygons")
 		_show_fallback("Tank")
 		return
-	sp.texture = tex
+	sp.texture = _tank_anim_tex if _tank_anim_tex != null else tex
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
 		var base_rect: Rect2 = _safe_region_rect(tex, first_rect)
@@ -170,7 +196,12 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 		print("[ArtAtlas] %s texture null -> keep fallback polygons" % label)
 		_show_fallback(label)
 		return
-	sp.texture = tex
+	if label == "Dealer" and _dealer.role == Dealer.Role.ARCHER and _archer_anim_tex != null:
+		sp.texture = _archer_anim_tex
+	elif label == "Boss" and _slime_anim_tex != null:
+		sp.texture = _slime_anim_tex
+	else:
+		sp.texture = tex
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
 		var base_rect: Rect2 = _safe_region_rect(tex, first_rect)
@@ -208,6 +239,12 @@ func _connect_feedback() -> void:
 	var tank_script: Tank = _tank as Tank
 	if tank_script != null:
 		tank_script.parry_attempted.connect(_on_tank_parry_attempted)
+	if _dealer != null:
+		_dealer.basic_attack_fired.connect(_on_dealer_basic_anim)
+		_dealer.link_skill_fired.connect(_on_dealer_link_anim)
+	var slime: KingSlime = _boss as KingSlime
+	if slime != null:
+		slime.attack_telegraph.connect(_on_slime_telegraph_anim)
 
 func _on_tank_parry_attempted() -> void:
 	if _vfx_tex == null:
@@ -225,6 +262,109 @@ func _on_tank_parry_attempted() -> void:
 		_parry_fx.scale = Vector2(1.6, 1.6)
 	await get_tree().create_timer(0.12).timeout
 	_parry_fx.visible = false
+
+func _on_dealer_basic_anim(_damage: int) -> void:
+	_archer_anim_state = "basic"
+	_archer_anim_t = 0.0
+
+func _on_dealer_link_anim(_name: String, _damage: int, _perfect: bool) -> void:
+	_archer_anim_state = "link"
+	_archer_anim_t = 0.0
+
+func _on_slime_telegraph_anim(_total: float, _perfect: float, name: String) -> void:
+	if name.find("박치기") >= 0:
+		_slime_anim_state = "dash"
+	elif name.find("점프") >= 0:
+		_slime_anim_state = "jump"
+	elif name.find("점액") >= 0:
+		_slime_anim_state = "spit"
+	elif name.find("왕관") >= 0:
+		_slime_anim_state = "crown"
+	_slime_anim_t = 0.0
+
+func _update_animation_states(delta: float) -> void:
+	_update_tank_anim(delta)
+	_update_archer_anim(delta)
+	_update_slime_anim(delta)
+
+func _update_tank_anim(delta: float) -> void:
+	if _tank_sprite == null or _tank_sprite.texture == null or _tank_anim_tex == null:
+		return
+	var tank_obj: Tank = _tank as Tank
+	if tank_obj == null:
+		return
+	if tank_obj.parry_active_timer > 0.0:
+		_tank_anim_state = "parry"
+	elif tank_obj.velocity.length() > 8.0:
+		_tank_anim_state = "walk"
+	else:
+		_tank_anim_state = "idle"
+	_tank_anim_t += delta
+	if _tank_anim_t >= 0.09:
+		_tank_anim_t = 0.0
+		_tank_frame = (_tank_frame + 1) % 4
+	var row: int = 0
+	if _tank_anim_state == "walk":
+		row = 1
+	elif _tank_anim_state == "parry":
+		row = 2
+	_set_sheet_frame(_tank_sprite, _tank_anim_tex, TANK_COLS, TANK_ROWS, _tank_frame, row)
+
+func _update_archer_anim(delta: float) -> void:
+	if _dealer_sprite == null or _dealer_sprite.texture == null:
+		return
+	if _dealer.role != Dealer.Role.ARCHER or _archer_anim_tex == null:
+		return
+	if _archer_anim_state == "basic" or _archer_anim_state == "link":
+		_archer_anim_t += delta
+		if _archer_anim_t > 0.35:
+			_archer_anim_state = "idle"
+	elif _dealer.velocity.length() > 8.0:
+		_archer_anim_state = "walk"
+	else:
+		_archer_anim_state = "idle"
+	_archer_anim_t += delta
+	if _archer_anim_t >= 0.1:
+		_archer_anim_t = 0.0
+		_archer_frame = (_archer_frame + 1) % 4
+	var row: int = 0
+	if _archer_anim_state == "walk":
+		row = 1
+	elif _archer_anim_state == "basic":
+		row = 2
+	elif _archer_anim_state == "link":
+		row = 3
+	_set_sheet_frame(_dealer_sprite, _archer_anim_tex, ARCHER_COLS, ARCHER_ROWS, _archer_frame, row)
+
+func _update_slime_anim(delta: float) -> void:
+	if _boss_sprite == null or _boss_sprite.texture == null or _slime_anim_tex == null:
+		return
+	var slime: KingSlime = _boss as KingSlime
+	if slime == null:
+		return
+	if slime.velocity.length() <= 5.0 and _slime_anim_t > 0.5:
+		_slime_anim_state = "idle"
+	_slime_anim_t += delta
+	if _slime_anim_t >= 0.11:
+		_slime_anim_t = 0.0
+		_slime_frame = (_slime_frame + 1) % 4
+	var row: int = 0
+	if _slime_anim_state == "dash":
+		row = 1
+	elif _slime_anim_state == "jump":
+		row = 2
+	elif _slime_anim_state == "spit" or _slime_anim_state == "crown":
+		row = 3
+	_set_sheet_frame(_boss_sprite, _slime_anim_tex, SLIME_COLS, SLIME_ROWS, _slime_frame, row)
+
+func _set_sheet_frame(sp: Sprite2D, tex: Texture2D, cols: int, rows: int, col: int, row: int) -> void:
+	if cols <= 0 or rows <= 0:
+		return
+	var size: Vector2 = tex.get_size()
+	var cw: float = size.x / float(cols)
+	var ch: float = size.y / float(rows)
+	sp.region_enabled = true
+	sp.region_rect = _safe_region_rect(tex, Rect2(Vector2(cw * float(col), ch * float(row)), Vector2(cw, ch)))
 
 func _update_dealer_role_region() -> void:
 	if _dealer_tex == null or _dealer_sprite == null or not _dealer_sprite.region_enabled:
