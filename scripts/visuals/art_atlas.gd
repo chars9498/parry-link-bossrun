@@ -21,6 +21,13 @@ const SLIME_ROWS: int = 4
 @export var debug_show_full_atlas: bool = false
 @export var tank_visual_multiplier: float = 2.8
 @export var dealer_visual_multiplier: float = 0.8
+@export var tank_cell_w: int = 0
+@export var tank_cell_h: int = 0
+@export var archer_cell_w: int = 0
+@export var archer_cell_h: int = 0
+@export var slime_cell_w: int = 0
+@export var slime_cell_h: int = 0
+@export var simplify_anim_to_first_frame: bool = true
 
 var _tank_tex: Texture2D
 var _dealer_tex: Texture2D
@@ -66,6 +73,7 @@ func _ready() -> void:
 	_tank_anim_tex = _load_texture(TANK_ANIM_PATH, "TankAnim")
 	_archer_anim_tex = _load_texture(ARCHER_ANIM_PATH, "ArcherAnim")
 	_slime_anim_tex = _load_texture(SLIME_ANIM_PATH, "SlimeAnim")
+	_log_anim_sheet_sizes()
 	_compute_cells()
 	_apply_environment_art()
 	_apply_character_art()
@@ -170,10 +178,11 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 	sp.texture = _tank_anim_tex if _tank_anim_tex != null else tex
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
-		var base_rect: Rect2 = _safe_region_rect(tex, first_rect)
-		var tight_rect: Rect2 = _tight_alpha_rect(tex, base_rect, 2)
+		var active_tex: Texture2D = sp.texture
+		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(first_rect.position, _cell_size_for(active_tex, TANK_COLS, TANK_ROWS, tank_cell_w, tank_cell_h)))
+		var tight_rect: Rect2 = _tight_alpha_rect(active_tex, base_rect, 2)
 		sp.region_rect = tight_rect
-		if not _region_has_visible_pixels(tex, sp.region_rect):
+		if not _region_has_visible_pixels(active_tex, sp.region_rect):
 			push_warning("[ArtAtlas] TANK region empty: %s" % [sp.region_rect])
 			_show_fallback("Tank")
 			return
@@ -204,15 +213,17 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 		sp.texture = tex
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
-		var base_rect: Rect2 = _safe_region_rect(tex, first_rect)
-		var tight_rect: Rect2 = _tight_alpha_rect(tex, base_rect, 2)
+		var active_tex: Texture2D = sp.texture
+		var base_size: Vector2 = _cell_size_for(active_tex, ARCHER_COLS if label == "Dealer" else SLIME_COLS if label == "Boss" else TANK_COLS, ARCHER_ROWS if label == "Dealer" else SLIME_ROWS if label == "Boss" else TANK_ROWS, archer_cell_w if label == "Dealer" else slime_cell_w if label == "Boss" else tank_cell_w, archer_cell_h if label == "Dealer" else slime_cell_h if label == "Boss" else tank_cell_h)
+		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(first_rect.position, base_size))
+		var tight_rect: Rect2 = _tight_alpha_rect(active_tex, base_rect, 2)
 		if label == "Tank":
 			sp.region_rect = tight_rect
 		elif label == "Dealer":
 			sp.region_rect = _blend_rect(base_rect, tight_rect, 0.55)
 		else:
 			sp.region_rect = base_rect
-		if not _region_has_visible_pixels(tex, sp.region_rect):
+		if not _region_has_visible_pixels(active_tex, sp.region_rect):
 			push_warning("[ArtAtlas] %s region seems empty: %s. Keeping fallback polygons." % [label, sp.region_rect])
 			_show_fallback(label)
 			return
@@ -302,7 +313,10 @@ func _update_tank_anim(delta: float) -> void:
 	_tank_anim_t += delta
 	if _tank_anim_t >= 0.09:
 		_tank_anim_t = 0.0
+		if not simplify_anim_to_first_frame:
 		_tank_frame = (_tank_frame + 1) % 4
+	else:
+		_tank_frame = 0
 	var row: int = 0
 	if _tank_anim_state == "walk":
 		row = 1
@@ -326,7 +340,10 @@ func _update_archer_anim(delta: float) -> void:
 	_archer_anim_t += delta
 	if _archer_anim_t >= 0.1:
 		_archer_anim_t = 0.0
+		if not simplify_anim_to_first_frame:
 		_archer_frame = (_archer_frame + 1) % 4
+	else:
+		_archer_frame = 0
 	var row: int = 0
 	if _archer_anim_state == "walk":
 		row = 1
@@ -347,7 +364,10 @@ func _update_slime_anim(delta: float) -> void:
 	_slime_anim_t += delta
 	if _slime_anim_t >= 0.11:
 		_slime_anim_t = 0.0
+		if not simplify_anim_to_first_frame:
 		_slime_frame = (_slime_frame + 1) % 4
+	else:
+		_slime_frame = 0
 	var row: int = 0
 	if _slime_anim_state == "dash":
 		row = 1
@@ -357,14 +377,33 @@ func _update_slime_anim(delta: float) -> void:
 		row = 3
 	_set_sheet_frame(_boss_sprite, _slime_anim_tex, SLIME_COLS, SLIME_ROWS, _slime_frame, row)
 
+func _log_anim_sheet_sizes() -> void:
+	if _tank_anim_tex != null:
+		print("[ArtAtlas] TANK_ANIM texture_width=", int(_tank_anim_tex.get_size().x), " texture_height=", int(_tank_anim_tex.get_size().y))
+	if _archer_anim_tex != null:
+		print("[ArtAtlas] ARCHER_ANIM texture_width=", int(_archer_anim_tex.get_size().x), " texture_height=", int(_archer_anim_tex.get_size().y))
+	if _slime_anim_tex != null:
+		print("[ArtAtlas] SLIME_ANIM texture_width=", int(_slime_anim_tex.get_size().x), " texture_height=", int(_slime_anim_tex.get_size().y))
+
+func _cell_size_for(tex: Texture2D, cols: int, rows: int, override_w: int, override_h: int) -> Vector2:
+	var size: Vector2 = tex.get_size()
+	var cw: float = size.x / float(max(cols, 1))
+	var ch: float = size.y / float(max(rows, 1))
+	if override_w > 0:
+		cw = float(override_w)
+	if override_h > 0:
+		ch = float(override_h)
+	return Vector2(max(cw, 1.0), max(ch, 1.0))
+
 func _set_sheet_frame(sp: Sprite2D, tex: Texture2D, cols: int, rows: int, col: int, row: int) -> void:
 	if cols <= 0 or rows <= 0:
 		return
-	var size: Vector2 = tex.get_size()
-	var cw: float = size.x / float(cols)
-	var ch: float = size.y / float(rows)
+	var cell: Vector2 = _cell_size_for(tex, cols, rows, tank_cell_w if tex == _tank_anim_tex else archer_cell_w if tex == _archer_anim_tex else slime_cell_w if tex == _slime_anim_tex else 0, tank_cell_h if tex == _tank_anim_tex else archer_cell_h if tex == _archer_anim_tex else slime_cell_h if tex == _slime_anim_tex else 0)
+	var cw: float = cell.x
+	var ch: float = cell.y
 	sp.region_enabled = true
 	sp.region_rect = _safe_region_rect(tex, Rect2(Vector2(cw * float(col), ch * float(row)), Vector2(cw, ch)))
+	print("[ArtAtlas] frame tex=", tex.resource_path, " cell_w=", cw, " cell_h=", ch, " region=", sp.region_rect)
 
 func _update_dealer_role_region() -> void:
 	if _dealer_tex == null or _dealer_sprite == null or not _dealer_sprite.region_enabled:
