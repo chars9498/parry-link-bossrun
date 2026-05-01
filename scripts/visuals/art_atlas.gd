@@ -314,7 +314,7 @@ func _update_tank_anim(delta: float) -> void:
 	if _tank_anim_t >= 0.09:
 		_tank_anim_t = 0.0
 		if not simplify_anim_to_first_frame:
-		_tank_frame = (_tank_frame + 1) % 4
+			_tank_frame = (_tank_frame + 1) % 4
 	else:
 		_tank_frame = 0
 	var row: int = 0
@@ -341,7 +341,7 @@ func _update_archer_anim(delta: float) -> void:
 	if _archer_anim_t >= 0.1:
 		_archer_anim_t = 0.0
 		if not simplify_anim_to_first_frame:
-		_archer_frame = (_archer_frame + 1) % 4
+			_archer_frame = (_archer_frame + 1) % 4
 	else:
 		_archer_frame = 0
 	var row: int = 0
@@ -365,7 +365,7 @@ func _update_slime_anim(delta: float) -> void:
 	if _slime_anim_t >= 0.11:
 		_slime_anim_t = 0.0
 		if not simplify_anim_to_first_frame:
-		_slime_frame = (_slime_frame + 1) % 4
+			_slime_frame = (_slime_frame + 1) % 4
 	else:
 		_slime_frame = 0
 	var row: int = 0
