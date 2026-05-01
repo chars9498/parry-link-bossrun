@@ -21,13 +21,19 @@ const SLIME_ROWS: int = 4
 @export var debug_show_full_atlas: bool = false
 @export var tank_visual_multiplier: float = 2.8
 @export var dealer_visual_multiplier: float = 0.8
-@export var tank_cell_w: int = 0
-@export var tank_cell_h: int = 0
-@export var archer_cell_w: int = 0
-@export var archer_cell_h: int = 0
-@export var slime_cell_w: int = 0
-@export var slime_cell_h: int = 0
+@export var tank_cell_w: int = 128
+@export var tank_cell_h: int = 128
+@export var archer_cell_w: int = 112
+@export var archer_cell_h: int = 112
+@export var slime_cell_w: int = 192
+@export var slime_cell_h: int = 160
 @export var simplify_anim_to_first_frame: bool = true
+@export var tank_frame_origin_x: int = 0
+@export var tank_frame_origin_y: int = 0
+@export var archer_frame_origin_x: int = 0
+@export var archer_frame_origin_y: int = 0
+@export var slime_frame_origin_x: int = 0
+@export var slime_frame_origin_y: int = 0
 
 var _tank_tex: Texture2D
 var _dealer_tex: Texture2D
@@ -179,7 +185,8 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
 		var active_tex: Texture2D = sp.texture
-		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(first_rect.position, _cell_size_for(active_tex, TANK_COLS, TANK_ROWS, tank_cell_w, tank_cell_h)))
+		var origin: Vector2 = Vector2(float(tank_frame_origin_x), float(tank_frame_origin_y))
+		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(origin, _cell_size_for(active_tex, TANK_COLS, TANK_ROWS, tank_cell_w, tank_cell_h)))
 		var tight_rect: Rect2 = _tight_alpha_rect(active_tex, base_rect, 2)
 		sp.region_rect = tight_rect
 		if not _region_has_visible_pixels(active_tex, sp.region_rect):
@@ -193,6 +200,8 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 	sp.z_index = z
 	sp.modulate = Color(1, 1, 1, 1)
 	print("[ArtAtlas] TANK texture size=", tex.get_size())
+	print("[ArtAtlas] TANK origin_x/y=", tank_frame_origin_x, "/", tank_frame_origin_y)
+	print("[ArtAtlas] TANK cell_w/h=", tank_cell_w, "/", tank_cell_h)
 	print("[ArtAtlas] TANK region=", sp.region_rect)
 	print("[ArtAtlas] TANK base_scale=", base_scale)
 	print("[ArtAtlas] TANK visual_multiplier=", tank_visual_multiplier)
@@ -215,7 +224,8 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	if sp.region_enabled:
 		var active_tex: Texture2D = sp.texture
 		var base_size: Vector2 = _cell_size_for(active_tex, ARCHER_COLS if label == "Dealer" else SLIME_COLS if label == "Boss" else TANK_COLS, ARCHER_ROWS if label == "Dealer" else SLIME_ROWS if label == "Boss" else TANK_ROWS, archer_cell_w if label == "Dealer" else slime_cell_w if label == "Boss" else tank_cell_w, archer_cell_h if label == "Dealer" else slime_cell_h if label == "Boss" else tank_cell_h)
-		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(first_rect.position, base_size))
+		var origin: Vector2 = Vector2(float(archer_frame_origin_x), float(archer_frame_origin_y)) if label == "Dealer" else Vector2(float(slime_frame_origin_x), float(slime_frame_origin_y)) if label == "Boss" else Vector2(float(tank_frame_origin_x), float(tank_frame_origin_y))
+		var base_rect: Rect2 = _safe_region_rect(active_tex, Rect2(origin, base_size))
 		var tight_rect: Rect2 = _tight_alpha_rect(active_tex, base_rect, 2)
 		if label == "Tank":
 			sp.region_rect = tight_rect
@@ -241,8 +251,14 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	var display_size: Vector2 = Vector2(src_size.x * sp.scale.x, src_size.y * sp.scale.y)
 	print("[ArtAtlas] %s sprite visible=%s scale=%s z=%s modulate=%s region_enabled=%s region=%s approx_display=%s" % [label, sp.visible, sp.scale, sp.z_index, sp.modulate, sp.region_enabled, sp.region_rect, display_size])
 	if label == "Dealer":
+		print("[ArtAtlas] ARCHER origin_x/y=", archer_frame_origin_x, "/", archer_frame_origin_y)
+		print("[ArtAtlas] ARCHER cell_w/h=", archer_cell_w, "/", archer_cell_h)
+		print("[ArtAtlas] ARCHER region_rect=", sp.region_rect)
 		print("[ArtAtlas] DEALER final_scale=", sp.scale)
 	elif label == "Boss":
+		print("[ArtAtlas] SLIME origin_x/y=", slime_frame_origin_x, "/", slime_frame_origin_y)
+		print("[ArtAtlas] SLIME cell_w/h=", slime_cell_w, "/", slime_cell_h)
+		print("[ArtAtlas] SLIME region_rect=", sp.region_rect)
 		print("[ArtAtlas] SLIME final_scale=", sp.scale)
 	_hide_actor_fallback(label)
 
@@ -402,7 +418,9 @@ func _set_sheet_frame(sp: Sprite2D, tex: Texture2D, cols: int, rows: int, col: i
 	var cw: float = cell.x
 	var ch: float = cell.y
 	sp.region_enabled = true
-	sp.region_rect = _safe_region_rect(tex, Rect2(Vector2(cw * float(col), ch * float(row)), Vector2(cw, ch)))
+	var ox: float = float(tank_frame_origin_x) if tex == _tank_anim_tex else float(archer_frame_origin_x) if tex == _archer_anim_tex else float(slime_frame_origin_x) if tex == _slime_anim_tex else 0.0
+	var oy: float = float(tank_frame_origin_y) if tex == _tank_anim_tex else float(archer_frame_origin_y) if tex == _archer_anim_tex else float(slime_frame_origin_y) if tex == _slime_anim_tex else 0.0
+	sp.region_rect = _safe_region_rect(tex, Rect2(Vector2(ox + cw * float(col), oy + ch * float(row)), Vector2(cw, ch)))
 	print("[ArtAtlas] frame tex=", tex.resource_path, " cell_w=", cw, " cell_h=", ch, " region=", sp.region_rect)
 
 func _update_dealer_role_region() -> void:
