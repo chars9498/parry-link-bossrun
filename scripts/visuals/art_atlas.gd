@@ -19,7 +19,8 @@ const SLIME_COLS: int = 6
 const SLIME_ROWS: int = 4
 
 @export var debug_show_full_atlas: bool = false
-@export var tank_visual_multiplier: float = 2.8
+@export var use_anim_sheets: bool = false
+@export var tank_visual_multiplier: float = 2.2
 @export var dealer_visual_multiplier: float = 0.8
 @export var tank_cell_w: int = 128
 @export var tank_cell_h: int = 128
@@ -76,10 +77,11 @@ func _ready() -> void:
 	_vfx_tex = _load_texture(VFX_ART_PATH, "VFX")
 	_props_tex = _load_texture(PROPS_ART_PATH, "Props")
 	_tiles_tex = _load_texture(TILESET_ART_PATH, "Tileset")
-	_tank_anim_tex = _load_texture(TANK_ANIM_PATH, "TankAnim")
-	_archer_anim_tex = _load_texture(ARCHER_ANIM_PATH, "ArcherAnim")
-	_slime_anim_tex = _load_texture(SLIME_ANIM_PATH, "SlimeAnim")
-	_log_anim_sheet_sizes()
+	if use_anim_sheets:
+		_tank_anim_tex = _load_texture(TANK_ANIM_PATH, "TankAnim")
+		_archer_anim_tex = _load_texture(ARCHER_ANIM_PATH, "ArcherAnim")
+		_slime_anim_tex = _load_texture(SLIME_ANIM_PATH, "SlimeAnim")
+		_log_anim_sheet_sizes()
 	_compute_cells()
 	_apply_environment_art()
 	_apply_character_art()
@@ -88,7 +90,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_dealer_role_region()
 	_update_boss_region()
-	_update_animation_states(delta)
+	if use_anim_sheets:
+		_update_animation_states(delta)
 
 func _load_texture(path: String, label: String) -> Texture2D:
 	if not ResourceLoader.exists(path):
@@ -159,9 +162,9 @@ func _apply_character_art() -> void:
 	_parry_fx.visible = false
 	_parry_fx.z_index = 8
 
-	_apply_tank_texture(_tank_sprite, _tank_tex, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 160.0), 32)
-	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 76.0), 30, "Dealer")
-	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 160.0), 25, "Boss")
+	_apply_tank_texture(_tank_sprite, _tank_tex, Rect2(Vector2.ZERO, _tank_cell), _uniform_scale_for_target(_tank_cell, 112.0), 32)
+	_apply_actor_texture(_dealer_sprite, _dealer_tex, _dealer_cell, Rect2(Vector2.ZERO, _dealer_cell), _uniform_scale_for_target(_dealer_cell, 72.0), 30, "Dealer")
+	_apply_actor_texture(_boss_sprite, _slime_tex, _slime_cell, Rect2(Vector2.ZERO, _slime_cell), _uniform_scale_for_target(_slime_cell, 148.0), 25, "Boss")
 	_add_shadow(_tank, "TankShadow", Vector2(40, 16), 27)
 	_add_shadow(_dealer, "DealerShadow", Vector2(34, 14), 26)
 	_add_shadow(_boss, "BossShadow", Vector2(66, 24), 24)
@@ -181,7 +184,7 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 		print("[ArtAtlas] TANK texture null -> keep fallback polygons")
 		_show_fallback("Tank")
 		return
-	sp.texture = _tank_anim_tex if _tank_anim_tex != null else tex
+	sp.texture = _tank_anim_tex if use_anim_sheets and _tank_anim_tex != null else tex
 	sp.region_enabled = not debug_show_full_atlas
 	if sp.region_enabled:
 		var active_tex: Texture2D = sp.texture
@@ -194,7 +197,7 @@ func _apply_tank_texture(sp: Sprite2D, tex: Texture2D, first_rect: Rect2, base_s
 			_show_fallback("Tank")
 			return
 	sp.visible = true
-	sp.offset = Vector2(0, -14)
+	sp.offset = Vector2(0, -8)
 	var final_scale: Vector2 = base_scale * tank_visual_multiplier
 	sp.scale = final_scale
 	sp.z_index = z
@@ -214,9 +217,9 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 		print("[ArtAtlas] %s texture null -> keep fallback polygons" % label)
 		_show_fallback(label)
 		return
-	if label == "Dealer" and _dealer.role == Dealer.Role.ARCHER and _archer_anim_tex != null:
+	if use_anim_sheets and label == "Dealer" and _dealer.role == Dealer.Role.ARCHER and _archer_anim_tex != null:
 		sp.texture = _archer_anim_tex
-	elif label == "Boss" and _slime_anim_tex != null:
+	elif use_anim_sheets and label == "Boss" and _slime_anim_tex != null:
 		sp.texture = _slime_anim_tex
 	else:
 		sp.texture = tex
@@ -242,7 +245,7 @@ func _apply_actor_texture(sp: Sprite2D, tex: Texture2D, cell: Vector2, first_rec
 	if label == "Tank":
 		sp.offset = Vector2(0, -7)
 	elif label == "Dealer":
-		sp.offset = Vector2(2, -5)
+		sp.offset = Vector2(6, -4)
 	else:
 		sp.offset = Vector2(0, -6)
 	sp.z_index = z
@@ -266,11 +269,11 @@ func _connect_feedback() -> void:
 	var tank_script: Tank = _tank as Tank
 	if tank_script != null:
 		tank_script.parry_attempted.connect(_on_tank_parry_attempted)
-	if _dealer != null:
+	if use_anim_sheets and _dealer != null:
 		_dealer.basic_attack_fired.connect(_on_dealer_basic_anim)
 		_dealer.link_skill_fired.connect(_on_dealer_link_anim)
 	var slime: KingSlime = _boss as KingSlime
-	if slime != null:
+	if use_anim_sheets and slime != null:
 		slime.attack_telegraph.connect(_on_slime_telegraph_anim)
 
 func _on_tank_parry_attempted() -> void:
@@ -315,6 +318,8 @@ func _update_animation_states(delta: float) -> void:
 	_update_slime_anim(delta)
 
 func _update_tank_anim(delta: float) -> void:
+	if not use_anim_sheets:
+		return
 	if _tank_sprite == null or _tank_sprite.texture == null or _tank_anim_tex == null:
 		return
 	var tank_obj: Tank = _tank as Tank
@@ -341,6 +346,8 @@ func _update_tank_anim(delta: float) -> void:
 	_set_sheet_frame(_tank_sprite, _tank_anim_tex, TANK_COLS, TANK_ROWS, _tank_frame, row)
 
 func _update_archer_anim(delta: float) -> void:
+	if not use_anim_sheets:
+		return
 	if _dealer_sprite == null or _dealer_sprite.texture == null:
 		return
 	if _dealer.role != Dealer.Role.ARCHER or _archer_anim_tex == null:
@@ -370,6 +377,8 @@ func _update_archer_anim(delta: float) -> void:
 	_set_sheet_frame(_dealer_sprite, _archer_anim_tex, ARCHER_COLS, ARCHER_ROWS, _archer_frame, row)
 
 func _update_slime_anim(delta: float) -> void:
+	if not use_anim_sheets:
+		return
 	if _boss_sprite == null or _boss_sprite.texture == null or _slime_anim_tex == null:
 		return
 	var slime: KingSlime = _boss as KingSlime
